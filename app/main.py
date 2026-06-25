@@ -13,7 +13,7 @@ app = FastAPI(title="VoiceGuardPay API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_ORIGIN, "http://localhost:3000"],
+    allow_origins=[settings.FRONTEND_ORIGIN, "https://voice-guard-pay.vercel.app/"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
