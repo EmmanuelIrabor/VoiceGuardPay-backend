@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     # ── CORS ─────────────────────────────────────────────────────────
     # Your deployed Next.js frontend URL + localhost for dev.
-    FRONTEND_ORIGIN: str = "https://voice-guard-pay.vercel.app/"  # <-- UPDATE with your Vercel frontend URL
+    FRONTEND_ORIGIN: str = "https://voice-guard-pay.vercel.app"  # <-- UPDATE with your Vercel frontend URL
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
