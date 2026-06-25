@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Use the POOLED connection string from Neon (has "-pooler" in the hostname).
     # Neon dashboard -> your project -> Connection Details -> Pooled connection.
     # Format: postgresql+asyncpg://<user>:<password>@<host>/<dbname>?sslmode=require
-    DATABASE_URL: str = ""  # <-- PASTE NEON POOLED CONNECTION STRING HERE (.env)
+    APP_DATABASE_URL: str = ""  # <-- PASTE NEON POOLED CONNECTION STRING HERE (.env)
 
     # Direct (non-pooled) URL — only needed for running Alembic migrations.
     # Neon dashboard -> Connection Details -> Direct connection.
