@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Your deployed Next.js frontend URL + localhost for dev.
     FRONTEND_ORIGIN: str = "https://voice-guard-pay.vercel.app"  # <-- UPDATE with your Vercel frontend URL
 
+    AZURE_SPEECH_KEY: str = ""
+    AZURE_SPEECH_REGION: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
