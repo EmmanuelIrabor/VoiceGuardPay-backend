@@ -1,5 +1,5 @@
 # app/api/routes/voice.py
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
@@ -10,6 +10,34 @@ from app.services import azure_voice_service
 
 router = APIRouter()
 
+# Add OPTIONS handlers for CORS preflight requests
+@router.options("/enroll")
+async def options_enroll():
+    return Response(
+        content="",
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin, X-Requested-With, Content-Disposition",
+            "Access-Control-Max-Age": "86400"
+        }
+    )
+
+@router.options("/verify")
+async def options_verify():
+    return Response(
+        content="",
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin, X-Requested-With, Content-Disposition",
+            "Access-Control-Max-Age": "86400"
+        }
+    )
 
 @router.post("/enroll")
 async def enroll_voice_sample(
