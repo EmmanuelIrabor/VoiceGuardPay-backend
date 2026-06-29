@@ -16,22 +16,18 @@ from app.models.location_ping import LocationPing
 router = APIRouter()
 
 NEARBY_RADIUS_METERS = 100
-STALE_SECONDS = 120          # generous: iOS cold-start GPS can take 20-40 s
-DEGREE_PER_METER = 1 / 111_320  # ~0.000009°/m at the equator (good enough for bbox)
+STALE_SECONDS = 300         
+DEGREE_PER_METER = 1 / 111_320 
 
 
-# ---------------------------------------------------------------------------
-# Schema
-# ---------------------------------------------------------------------------
+
 
 class LocationUpdate(BaseModel):
     latitude: float
     longitude: float
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
+
 
 @router.post("/update-location")
 async def update_location(
