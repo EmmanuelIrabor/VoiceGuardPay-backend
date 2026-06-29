@@ -1,7 +1,4 @@
-"""
-Ephemeral location data — one row per user, overwritten on each update.
-Not a history log, just "where is this person right now."
-"""
+
 import uuid
 from datetime import datetime, timezone
 
