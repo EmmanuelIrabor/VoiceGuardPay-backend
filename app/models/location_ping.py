@@ -17,16 +17,17 @@ class LocationPing(Base):
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
 
-    # Use server_default + onupdate at DB level so async ORM mutations trigger it reliably
+    # server_default + explicit assignment in routes = reliable across async sessions.
+    # Do NOT rely on onupdate alone — async SQLAlchemy doesn't always fire it on
+    # attribute mutation without an explicit flush.
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        onupdate=func.now(),
         nullable=False,
     )
 
     __table_args__ = (
-        # Composite index so the bounding-box WHERE clause in /nearby hits an index
-        # instead of doing a full table scan. Order: lat first (higher cardinality filter).
+        # Composite index so the bounding-box WHERE lat BETWEEN / lng BETWEEN
+        # clause in /nearby hits an index scan instead of a full table scan.
         Index("ix_location_pings_lat_lng", "latitude", "longitude"),
     )

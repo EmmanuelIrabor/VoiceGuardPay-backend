@@ -1,10 +1,11 @@
 
-import math
+
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
+from geopy.distance import geodesic
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -14,34 +15,13 @@ from app.models.location_ping import LocationPing
 
 router = APIRouter()
 
-NEARBY_RADIUS_METERS = 100          # generous for same-room / same-building
-STALE_SECONDS = 30                  # ignore pings older than this
+NEARBY_RADIUS_METERS = 100
+STALE_SECONDS = 120          # generous: iOS cold-start GPS can take 20-40 s
+DEGREE_PER_METER = 1 / 111_320  # ~0.000009°/m at the equator (good enough for bbox)
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _degree_delta(meters: float) -> float:
-    """Rough degree delta for a metre distance (good enough for a bounding box)."""
-    return meters / 111_320
-
-
-def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Distance in metres between two GPS points."""
-    R = 6_371_000
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = (
-        math.sin(dphi / 2) ** 2
-        + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    )
-    return 2 * R * math.asin(math.sqrt(a))
-
-
-# ---------------------------------------------------------------------------
-# Schemas
+# Schema
 # ---------------------------------------------------------------------------
 
 class LocationUpdate(BaseModel):
@@ -61,10 +41,9 @@ async def update_location(
 ):
     """
     Upsert the caller's location ping.
-
-    We use an explicit INSERT … ON CONFLICT DO UPDATE (via two-step
-    get-then-set) but touch updated_at ourselves so the async ORM session
-    doesn't miss the mutation.
+    updated_at is assigned explicitly so the async ORM session actually
+    emits the value rather than relying on server-side onupdate triggers
+    (which fire inconsistently with db.get() + attribute mutation in async).
     """
     now = datetime.now(timezone.utc)
     ping = await db.get(LocationPing, current_user.id)
@@ -78,10 +57,9 @@ async def update_location(
         )
         db.add(ping)
     else:
-        # Assign all three so SQLAlchemy marks the row dirty and emits UPDATE
         ping.latitude = payload.latitude
         ping.longitude = payload.longitude
-        ping.updated_at = now
+        ping.updated_at = now   # explicit — do not rely on ORM onupdate hook
 
     await db.commit()
     return {"status": "updated"}
@@ -94,14 +72,12 @@ async def get_nearby_users(
 ):
     my_ping = await db.get(LocationPing, current_user.id)
     if my_ping is None:
-        return {"nearby": []}
+        return {"nearby": [], "debug": "caller has no ping — push location first"}
 
-    # --- Bounding box in SQL so the (lat, lng) index is used ---------------
-    delta = _degree_delta(NEARBY_RADIUS_METERS)
-    lat_min = my_ping.latitude - delta
-    lat_max = my_ping.latitude + delta
-    lng_min = my_ping.longitude - delta
-    lng_max = my_ping.longitude + delta
+    # Bounding box: narrow the SQL result set before running geopy on each row.
+    # At 100 m radius the degree delta is ~0.0009°, so the index eliminates
+    # almost all rows before they reach Python.
+    delta = NEARBY_RADIUS_METERS * DEGREE_PER_METER
     stale_cutoff = datetime.now(timezone.utc) - timedelta(seconds=STALE_SECONDS)
 
     result = await db.execute(
@@ -109,20 +85,26 @@ async def get_nearby_users(
         .join(User, User.id == LocationPing.user_id)
         .where(
             LocationPing.user_id != current_user.id,
-            LocationPing.latitude.between(lat_min, lat_max),
-            LocationPing.longitude.between(lng_min, lng_max),
-            LocationPing.updated_at >= stale_cutoff,   # drop ghost users
+            LocationPing.latitude.between(
+                my_ping.latitude - delta, my_ping.latitude + delta
+            ),
+            LocationPing.longitude.between(
+                my_ping.longitude - delta, my_ping.longitude + delta
+            ),
+            LocationPing.updated_at >= stale_cutoff,
         )
     )
 
-    # --- Exact haversine check on the much-smaller candidate set ------------
     nearby = []
     for ping, user in result.all():
-        distance = haversine_distance(
-            my_ping.latitude, my_ping.longitude,
-            ping.latitude, ping.longitude,
-        )
-        if distance <= NEARBY_RADIUS_METERS:
+        # geopy geodesic: WGS-84 ellipsoid — more accurate than haversine,
+        # especially at high latitudes. Takes (lat, lon) tuples.
+        distance_m = geodesic(
+            (my_ping.latitude, my_ping.longitude),
+            (ping.latitude, ping.longitude),
+        ).meters
+
+        if distance_m <= NEARBY_RADIUS_METERS:
             masked_account = (
                 f"•••• {user.bank_account_number[-4:]}"
                 if getattr(user, "bank_account_number", None)
@@ -132,8 +114,38 @@ async def get_nearby_users(
                 "user_id": str(user.id),
                 "name": user.name,
                 "masked_account": masked_account,
-                "distance_meters": round(distance, 1),
+                "distance_meters": round(distance_m, 1),
             })
 
     nearby.sort(key=lambda x: x["distance_meters"])
     return {"nearby": nearby}
+
+
+@router.get("/debug-ping")
+async def debug_ping(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Dev endpoint — call this on both devices to confirm pings are landing.
+    Returns the stored lat/lng and how many seconds ago it was written.
+    Remove or gate behind an env flag before going to production.
+    """
+    ping = await db.get(LocationPing, current_user.id)
+    if ping is None:
+        return {
+            "status": "no_ping",
+            "message": "No location on record. The push hasn't landed yet.",
+        }
+
+    age_seconds = (datetime.now(timezone.utc) - ping.updated_at).total_seconds()
+    stale = age_seconds > STALE_SECONDS
+
+    return {
+        "status": "stale" if stale else "fresh",
+        "latitude": ping.latitude,
+        "longitude": ping.longitude,
+        "age_seconds": round(age_seconds, 1),
+        "stale_threshold_seconds": STALE_SECONDS,
+        "will_appear_in_nearby": not stale,
+    }
