@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes import auth
 from app.api.routes import voice
+from app.api.routes import proximity
+
 
 
 app = FastAPI(title="VoiceGuardPay API")
@@ -71,6 +73,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(voice.router, prefix="/voice", tags=["voice"])
+app.include_router(proximity.router, prefix="/proximity", tags=["proximity"])
 
 
 @app.get("/health")

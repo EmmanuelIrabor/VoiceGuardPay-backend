@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.core.config import settings
 from app.core.database import Base
 from app.models import user  # noqa: F401 — import all models so Alembic sees them
+from app.models import user, location_ping  # noqa: F401
 
 config = context.config
 

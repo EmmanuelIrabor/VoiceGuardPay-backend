@@ -49,3 +49,21 @@ async def verify_audio(profile_id: str, audio_bytes: bytes) -> dict:
         )
         response.raise_for_status()
         return response.json()  # contains recognitionResult: "Accept" or "Reject", and score
+    
+# app/services/azure_voice_service.py — add this function
+async def text_to_speech(text: str) -> bytes:
+    """Returns raw audio bytes (MP3) for the given text."""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        response = await client.post(
+            f"https://{settings.AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1",
+            headers={
+                "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+                "Content-Type": "application/ssml+xml",
+                "X-Microsoft-OutputFormat": "audio-16khz-128kbitrate-mono-mp3",
+            },
+            content=f"""<speak version='1.0' xml:lang='en-US'>
+                <voice xml:lang='en-US' name='en-US-JennyNeural'>{text}</voice>
+            </speak>""".encode("utf-8"),
+        )
+        response.raise_for_status()
+        return response.content
