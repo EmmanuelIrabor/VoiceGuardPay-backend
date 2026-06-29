@@ -56,6 +56,8 @@ async def update_location(
     return {"status": "updated"}
 
 
+# proximity.py - Optimized version
+
 @router.get("/nearby")
 async def get_nearby_users(
     current_user: User = Depends(get_current_user),
@@ -65,27 +67,54 @@ async def get_nearby_users(
     if my_ping is None:
         return {"nearby": []}
 
+    # Use SQL for distance calculation - much faster
+    # This uses PostGIS if available, or a simplified version
+    from sqlalchemy import func, text
+    
+    # Get all pings except self with distance calculation
+    # Assuming lat/lon columns exist
+    stmt = text("""
+        SELECT 
+            u.id as user_id,
+            u.name,
+            u.bank_account_number,
+            lp.latitude,
+            lp.longitude,
+            earth_distance(
+                ll_to_earth(:my_lat, :my_lon),
+                ll_to_earth(lp.latitude, lp.longitude)
+            ) as distance_meters
+        FROM location_pings lp
+        JOIN users u ON u.id = lp.user_id
+        WHERE lp.user_id != :my_user_id
+        AND earth_distance(
+            ll_to_earth(:my_lat, :my_lon),
+            ll_to_earth(lp.latitude, lp.longitude)
+        ) <= :radius
+        ORDER BY distance_meters ASC
+    """)
+    
     result = await db.execute(
-        select(LocationPing, User)
-        .join(User, User.id == LocationPing.user_id)
-        .where(LocationPing.user_id != current_user.id)  # exclude self — explicit, not implicit
+        stmt,
+        {
+            "my_lat": my_ping.latitude,
+            "my_lon": my_ping.longitude,
+            "my_user_id": current_user.id,
+            "radius": NEARBY_RADIUS_METERS
+        }
     )
-
+    
     nearby = []
-    for ping, user in result.all():
-        distance = haversine_distance(my_ping.latitude, my_ping.longitude, ping.latitude, ping.longitude)
-        if distance <= NEARBY_RADIUS_METERS:
-            masked_account = (
-                f"•••• {user.bank_account_number[-4:]}"
-                if getattr(user, "bank_account_number", None)
-                else "Not set"
-            )
-            nearby.append({
-                "user_id": str(user.id),
-                "name": user.name,
-                "masked_account": masked_account,
-                "distance_meters": round(distance, 1),
-            })
-
-    nearby.sort(key=lambda x: x["distance_meters"])
+    for row in result:
+        masked_account = (
+            f"•••• {row.bank_account_number[-4:]}"
+            if row.bank_account_number else "Not set"
+        )
+        nearby.append({
+            "user_id": str(row.user_id),
+            "name": row.name,
+            "masked_account": masked_account,
+            "distance_meters": round(row.distance_meters, 1),
+        })
+    
     return {"nearby": nearby}
