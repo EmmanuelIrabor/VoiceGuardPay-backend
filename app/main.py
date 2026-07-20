@@ -72,7 +72,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(voice.router, prefix="/voice", tags=["voice"])
 app.include_router(proximity.router, prefix="/proximity", tags=["proximity"])
-app.include_router(webhook.router, prefix="/webhook", tags=["webhook"])
+app.include_router(webhook.router, tags=["webhook"])
 
 
 @app.get("/health")
