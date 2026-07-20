@@ -1,7 +1,4 @@
-"""
-FastAPI app instance. This is what both `uvicorn` (local) and Vercel's
-Python runtime (prod, via api/index.py) ultimately serve.
-"""
+
 
 import traceback
 
@@ -12,6 +9,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes import auth
 from app.api.routes import voice
 from app.api.routes import proximity
+from app.api.routes import webhook
 
 
 
@@ -74,6 +72,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(voice.router, prefix="/voice", tags=["voice"])
 app.include_router(proximity.router, prefix="/proximity", tags=["proximity"])
+app.include_router(webhook.router, prefix="/webhook", tags=["webhook"])
 
 
 @app.get("/health")
