@@ -10,6 +10,7 @@ from app.api.routes import auth
 from app.api.routes import voice
 from app.api.routes import proximity
 from app.api.routes import webhook
+from app.api.routes import payments
 
 
 
@@ -47,10 +48,6 @@ def health():
     return {"status": "ok"}
 
 
-"""
-FastAPI app instance. This is what both `uvicorn` (local) and Vercel's
-Python runtime (prod, via api/index.py) ultimately serve.
-"""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -73,6 +70,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(voice.router, prefix="/voice", tags=["voice"])
 app.include_router(proximity.router, prefix="/proximity", tags=["proximity"])
 app.include_router(webhook.router, tags=["webhook"])
+app.include_router(payments.router, tags=["payments"])
 
 
 @app.get("/health")

@@ -35,12 +35,7 @@ async def update_location(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Upsert the caller's location ping.
-    updated_at is assigned explicitly so the async ORM session actually
-    emits the value rather than relying on server-side onupdate triggers
-    (which fire inconsistently with db.get() + attribute mutation in async).
-    """
+  
     now = datetime.now(timezone.utc)
     ping = await db.get(LocationPing, current_user.id)
 
@@ -55,7 +50,7 @@ async def update_location(
     else:
         ping.latitude = payload.latitude
         ping.longitude = payload.longitude
-        ping.updated_at = now   # explicit — do not rely on ORM onupdate hook
+        ping.updated_at = now   
 
     await db.commit()
     return {"status": "updated"}
@@ -70,9 +65,7 @@ async def get_nearby_users(
     if my_ping is None:
         return {"nearby": [], "debug": "caller has no ping — push location first"}
 
-    # Bounding box: narrow the SQL result set before running geopy on each row.
-    # At 100 m radius the degree delta is ~0.0009°, so the index eliminates
-    # almost all rows before they reach Python.
+    
     delta = NEARBY_RADIUS_METERS * DEGREE_PER_METER
     stale_cutoff = datetime.now(timezone.utc) - timedelta(seconds=STALE_SECONDS)
 
@@ -93,8 +86,7 @@ async def get_nearby_users(
 
     nearby = []
     for ping, user in result.all():
-        # geopy geodesic: WGS-84 ellipsoid — more accurate than haversine,
-        # especially at high latitudes. Takes (lat, lon) tuples.
+        
         distance_m = geodesic(
             (my_ping.latitude, my_ping.longitude),
             (ping.latitude, ping.longitude),
@@ -122,11 +114,7 @@ async def debug_ping(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Dev endpoint — call this on both devices to confirm pings are landing.
-    Returns the stored lat/lng and how many seconds ago it was written.
-    Remove or gate behind an env flag before going to production.
-    """
+    
     ping = await db.get(LocationPing, current_user.id)
     if ping is None:
         return {

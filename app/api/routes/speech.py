@@ -1,4 +1,4 @@
-# app/api/routes/speech.py — new route
+
 from fastapi.responses import Response
 from app.services.azure_voice_service import text_to_speech
 from fastapi import APIRouter, Depends
