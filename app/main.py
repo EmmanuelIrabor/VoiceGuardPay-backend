@@ -13,7 +13,6 @@ from app.api.routes import webhook
 from app.api.routes import payments
 
 
-
 app = FastAPI(title="VoiceGuardPay API")
 
 app.add_middleware(
