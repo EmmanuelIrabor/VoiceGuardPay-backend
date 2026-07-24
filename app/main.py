@@ -10,7 +10,7 @@ from app.api.routes import auth
 from app.api.routes import voice
 from app.api.routes import proximity
 from app.api.routes import webhook
-# from app.api.routes import payments
+from app.api.routes import payments
 
 
 
@@ -70,7 +70,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(voice.router, prefix="/voice", tags=["voice"])
 app.include_router(proximity.router, prefix="/proximity", tags=["proximity"])
 app.include_router(webhook.router, tags=["webhook"])
-# app.include_router(payments.router, tags=["payments"])
+app.include_router(payments.router, tags=["payments"])
 
 
 @app.get("/health")
